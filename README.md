@@ -1,3 +1,5 @@
+*Do not use this repo at the moment: Nothing is implemented yet, nothing works. *
+
 # labloid
 Lab Blog with IPython notebooks and git
 
