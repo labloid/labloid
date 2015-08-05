@@ -51,13 +51,18 @@ class Role(db.Model):
         return '<Role %r>' % self.name
 
 
-class Follow(db.Model):
+
+
+class Grouping(db.Model):
     __tablename__ = 'follows'
-    follower_id = db.Column(db.Integer, db.ForeignKey('users.id'),
+
+    groupname = db.Column(db.String(256), primary_key=True, index=True)
+    member_id = db.Column(db.Integer, db.ForeignKey('users.id'),
                             primary_key=True)
-    followed_id = db.Column(db.Integer, db.ForeignKey('users.id'),
+    owner_id = db.Column(db.Integer, db.ForeignKey('users.id'),
                             primary_key=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 
 class User(UserMixin, db.Model):
@@ -65,6 +70,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(64), unique=True, index=True)
     username = db.Column(db.String(64), unique=True, index=True)
+    git_repo = db.Column(db.String(256), unique=True, index=True)
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
     password_hash = db.Column(db.String(128))
     confirmed = db.Column(db.Boolean, default=False)
@@ -75,42 +81,20 @@ class User(UserMixin, db.Model):
     last_seen = db.Column(db.DateTime(), default=datetime.utcnow)
     avatar_hash = db.Column(db.String(32))
     posts = db.relationship('Post', backref='author', lazy='dynamic')
-    followed = db.relationship('Follow',
-                               foreign_keys=[Follow.follower_id],
-                               backref=db.backref('follower', lazy='joined'),
+    in_group_of = db.relationship('Grouping',
+                               foreign_keys=[Grouping.member_id],
+                               backref=db.backref('member', lazy='joined'),
                                lazy='dynamic',
                                cascade='all, delete-orphan')
-    followers = db.relationship('Follow',
-                                foreign_keys=[Follow.followed_id],
-                                backref=db.backref('followed', lazy='joined'),
+    has_in_groups = db.relationship('Grouping',
+                                foreign_keys=[Grouping.owner_id],
+                                backref=db.backref('owner', lazy='joined'),
                                 lazy='dynamic',
                                 cascade='all, delete-orphan')
     comments = db.relationship('Comment', backref='author', lazy='dynamic')
 
     @staticmethod
-    def generate_fake(count=100):
-        from sqlalchemy.exc import IntegrityError
-        from random import seed
-        import forgery_py
-
-        seed()
-        for i in range(count):
-            u = User(email=forgery_py.internet.email_address(),
-                     username=forgery_py.internet.user_name(True),
-                     password=forgery_py.lorem_ipsum.word(),
-                     confirmed=True,
-                     name=forgery_py.name.full_name(),
-                     location=forgery_py.address.city(),
-                     about_me=forgery_py.lorem_ipsum.sentence(),
-                     member_since=forgery_py.date.date(True))
-            db.session.add(u)
-            try:
-                db.session.commit()
-            except IntegrityError:
-                db.session.rollback()
-
-    @staticmethod
-    def add_self_follows():
+    def add_self_group():
         for user in User.query.all():
             if not user.is_following(user):
                 user.follow(user)
@@ -127,7 +111,7 @@ class User(UserMixin, db.Model):
         if self.email is not None and self.avatar_hash is None:
             self.avatar_hash = hashlib.md5(
                 self.email.encode('utf-8')).hexdigest()
-        self.followed.append(Follow(followed=self))
+        self.in_group_of.append(Grouping(followed=self))
 
     @property
     def password(self):
@@ -218,26 +202,26 @@ class User(UserMixin, db.Model):
 
     def follow(self, user):
         if not self.is_following(user):
-            f = Follow(follower=self, followed=user)
+            f = Grouping(groupname=self.name, owner=self, member=user)
             db.session.add(f)
 
     def unfollow(self, user):
-        f = self.followed.filter_by(followed_id=user.id).first()
+        f = self.in_group_of.filter_by(followed_id=user.id).first()
         if f:
             db.session.delete(f)
 
     def is_following(self, user):
-        return self.followed.filter_by(
+        return self.in_group_of.filter_by(
             followed_id=user.id).first() is not None
 
     def is_followed_by(self, user):
-        return self.followers.filter_by(
+        return self.has_in_groups.filter_by(
             follower_id=user.id).first() is not None
 
     @property
     def followed_posts(self):
-        return Post.query.join(Follow, Follow.followed_id == Post.author_id)\
-            .filter(Follow.follower_id == self.id)
+        return Post.query.join(Grouping, Grouping.owner_id == Post.author_id)\
+            .filter(Grouping.member_id == self.id)
 
     def to_json(self):
         json_user = {
