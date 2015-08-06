@@ -11,9 +11,9 @@ from . import db, login_manager
 
 
 class Permission:
-    FOLLOW = 0x01
+    READ = 0x01
     COMMENT = 0x02
-    WRITE_ARTICLES = 0x04
+    POST = 0x04
     MODERATE_COMMENTS = 0x08
     ADMINISTER = 0x80
 
@@ -24,17 +24,19 @@ class Role(db.Model):
     name = db.Column(db.String(64), unique=True)
     default = db.Column(db.Boolean, default=False, index=True)
     permissions = db.Column(db.Integer)
-    users = db.relationship('User', backref='role', lazy='dynamic')
+    groups = db.relationship('GroupMembership', backref='role', lazy='dynamic')
 
     @staticmethod
     def insert_roles():
         roles = {
-            'User': (Permission.FOLLOW |
+            'Reader': (Permission.READ |
+                       Permission.COMMENT, True),
+            'User': (Permission.READ |
                      Permission.COMMENT |
-                     Permission.WRITE_ARTICLES, True),
-            'Moderator': (Permission.FOLLOW |
+                     Permission.POST, True),
+            'Moderator': (Permission.READ |
                           Permission.COMMENT |
-                          Permission.WRITE_ARTICLES |
+                          Permission.POST |
                           Permission.MODERATE_COMMENTS, False),
             'Administrator': (0xff, False)
         }
@@ -50,18 +52,26 @@ class Role(db.Model):
     def __repr__(self):
         return '<Role %r>' % self.name
 
+class GroupMembership(db.Model):
+    __tablename__ = 'groupmembership'
+    member_id = db.Column(db.Integer, db.ForeignKey('users.id'),
+                          primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('postgroup.id'),
+                         primary_key=True)
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
 
 
-
-class Feed(db.Model):
-    __tablename__ = 'follows'
-
-    name = db.Column(db.String(256), primary_key=True, index=True)
-    receiver_id = db.Column(db.Integer, db.ForeignKey('users.id'),
-                            primary_key=True)
-    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'),
-                            primary_key=True)
+class PostGroup(db.Model):
+    __tablename__ = 'postgroup'
+    id = db.Column(db.Integer, primary_key=True)
+    groupname = db.Column(db.String(256), primary_key=True, index=True)
+    members = db.relationship('GroupMembership',
+                              foreign_keys=[GroupMembership.group_id],
+                              backref=db.backref('groups', lazy='joined'),
+                              lazy='dynamic',
+                              cascade='all, delete-orphan')
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 
 
@@ -72,7 +82,6 @@ class User(UserMixin, db.Model):
     name = db.Column(db.String(64))
 
     email = db.Column(db.String(64), unique=True, index=True)
-    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
 
     password_hash = db.Column(db.String(128))
     confirmed = db.Column(db.Boolean, default=False)
@@ -84,37 +93,21 @@ class User(UserMixin, db.Model):
     avatar_hash = db.Column(db.String(32))
     posts = db.relationship('Post', backref='author', lazy='dynamic')
 
-    reads = db.relationship('Audience',
-                               foreign_keys=[Feed.receiver_id],
-                               backref=db.backref('member', lazy='joined'),
-                               lazy='dynamic',
-                               cascade='all, delete-orphan')
-    feeds_to = db.relationship('Audience',
-                                foreign_keys=[Feed.sender_id],
-                                backref=db.backref('owner', lazy='joined'),
-                                lazy='dynamic',
-                                cascade='all, delete-orphan')
+    groups = db.relationship('GroupMembership',
+                             foreign_keys=[GroupMembership.member_id],
+                             backref=db.backref('members', lazy='joined'),
+                             lazy='dynamic',
+                             cascade='all, delete-orphan')
+
     comments = db.relationship('Comment', backref='author', lazy='dynamic')
 
-    @staticmethod
-    def feed_to_self():
-        for user in User.query.all():
-            if not user.is_reader_of(user):
-                user.add_to_feed(user.name, user)
-                db.session.add(user)
-                db.session.commit()
 
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)
-        if self.role is None:
-            if self.email == current_app.config['FLASKY_ADMIN']:
-                self.role = Role.query.filter_by(permissions=0xff).first()
-            if self.role is None:
-                self.role = Role.query.filter_by(default=True).first()
+
         if self.email is not None and self.avatar_hash is None:
             self.avatar_hash = hashlib.md5(
                 self.email.encode('utf-8')).hexdigest()
-        self.reads.append(Feed(followed=self))
 
     @property
     def password(self):
@@ -182,13 +175,6 @@ class User(UserMixin, db.Model):
         db.session.add(self)
         return True
 
-    def can(self, permissions):
-        return self.role is not None and \
-            (self.role.permissions & permissions) == permissions
-
-    def is_administrator(self):
-        return self.can(Permission.ADMINISTER)
-
     def ping(self):
         self.last_seen = datetime.utcnow()
         db.session.add(self)
@@ -203,56 +189,6 @@ class User(UserMixin, db.Model):
         return '{url}/{hash}?s={size}&d={default}&r={rating}'.format(
             url=url, hash=hash, size=size, default=default, rating=rating)
 
-    def add_to_feed(self, user, name):
-        if not self.is_reader_of(user):
-            f = Feed(name=name, reads=self, feeds_to=user)
-            db.session.add(f)
-
-    def leave_feed(self, user, name):
-        f = self.reads.filter_by(sender_id=user.id, name=name).first()
-        if f:
-            db.session.delete(f)
-
-    def is_reader_of(self, user):
-        return self.reads.filter_by(
-            followed_id=user.id).first() is not None
-
-    def writes_for(self, user):
-        return self.feeds_to.filter_by(
-            receiver_id=user.id).first() is not None
-
-    @property
-    def my_articles(self):
-        return Post.query.join(Feed, Feed.sender_id == Post.author_id)\
-            .filter(Feed.receiver_id == self.id)
-
-    def to_json(self):
-        json_user = {
-            'url': url_for('api.get_post', id=self.id, _external=True),
-            'username': self.username,
-            'member_since': self.member_since,
-            'last_seen': self.last_seen,
-            'posts': url_for('api.get_user_posts', id=self.id, _external=True),
-            'followed_posts': url_for('api.get_user_followed_posts',
-                                      id=self.id, _external=True),
-            'post_count': self.posts.count()
-        }
-        return json_user
-
-    def generate_auth_token(self, expiration):
-        s = Serializer(current_app.config['SECRET_KEY'],
-                       expires_in=expiration)
-        return s.dumps({'id': self.id}).decode('ascii')
-
-    @staticmethod
-    def verify_auth_token(token):
-        s = Serializer(current_app.config['SECRET_KEY'])
-        try:
-            data = s.loads(token)
-        except:
-            return None
-        return User.query.get(data['id'])
-
     def __repr__(self):
         return '<User %r>' % self.username
 
@@ -263,6 +199,7 @@ class AnonymousUser(AnonymousUserMixin):
 
     def is_administrator(self):
         return False
+
 
 login_manager.anonymous_user = AnonymousUser
 
@@ -280,22 +217,7 @@ class Post(db.Model):
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     author_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     comments = db.relationship('Comment', backref='post', lazy='dynamic')
-
-    @staticmethod
-    def generate_fake(count=100):
-        from random import seed, randint
-        import forgery_py
-
-        seed()
-        user_count = User.query.count()
-        for i in range(count):
-            u = User.query.offset(randint(0, user_count - 1)).first()
-            p = Post(body=forgery_py.lorem_ipsum.sentences(randint(1, 5)),
-                     timestamp=forgery_py.date.date(True),
-                     author=u)
-            db.session.add(p)
-            db.session.commit()
-
+    #TODO: GROUPS
     @staticmethod
     def on_changed_body(target, value, oldvalue, initiator):
         allowed_tags = ['a', 'abbr', 'acronym', 'b', 'blockquote', 'code',
