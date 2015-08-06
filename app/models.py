@@ -18,25 +18,56 @@ class Permission:
     ADMINISTER = 0x80
 
 
-class Role(db.Model):
-    __tablename__ = 'roles'
+class GroupRole(db.Model):
+    __tablename__ = 'grouproles'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(64), unique=True)
     default = db.Column(db.Boolean, default=False, index=True)
     permissions = db.Column(db.Integer)
-    groups = db.relationship('GroupMembership', backref='role', lazy='dynamic')
 
     @staticmethod
     def insert_roles():
         roles = {
             'Reader': (Permission.READ |
                        Permission.COMMENT, True),
-            'User': (Permission.READ |
+            'Poster': (Permission.READ |
                      Permission.COMMENT |
                      Permission.POST, True),
             'Moderator': (Permission.READ |
                           Permission.COMMENT |
                           Permission.POST |
+                          Permission.MODERATE_COMMENTS, False),
+            'Owner': (0xff, False)
+        }
+        for r in roles:
+            role = GroupRole.query.filter_by(name=r).first()
+            if role is None:
+                role = GroupRole(name=r)
+            role.permissions = roles[r][0]
+            role.default = roles[r][1]
+            db.session.add(role)
+        db.session.commit()
+
+    def __repr__(self):
+        return '<GroupRole %r>' % self.name
+
+class Role(db.Model):
+    __tablename__ = 'roles'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True)
+    default = db.Column(db.Boolean, default=False, index=True)
+    permissions = db.Column(db.Integer)
+    users = db.relationship('User', backref='role', lazy='dynamic')
+
+    @staticmethod
+    def insert_roles():
+        roles = {
+            'User': (Permission.FOLLOW |
+                     Permission.COMMENT |
+                     Permission.WRITE_ARTICLES, True),
+            'Moderator': (Permission.FOLLOW |
+                          Permission.COMMENT |
+                          Permission.WRITE_ARTICLES |
                           Permission.MODERATE_COMMENTS, False),
             'Administrator': (0xff, False)
         }
@@ -52,26 +83,33 @@ class Role(db.Model):
     def __repr__(self):
         return '<Role %r>' % self.name
 
-class GroupMembership(db.Model):
-    __tablename__ = 'groupmembership'
-    member_id = db.Column(db.Integer, db.ForeignKey('users.id'),
-                          primary_key=True)
-    group_id = db.Column(db.Integer, db.ForeignKey('postgroup.id'),
-                         primary_key=True)
-    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
 
+groupmemberships = db.Table('groupmembership',
+    db.Column('member_id', db.Integer, db.ForeignKey('users.id')),
+    db.Column('group_id',  db.Integer, db.ForeignKey('postgroup.id')),
+    db.Column('grouprole_id', db.Integer, db.ForeignKey('grouproles.id'))
+)
 
 class PostGroup(db.Model):
     __tablename__ = 'postgroup'
     id = db.Column(db.Integer, primary_key=True)
-    groupname = db.Column(db.String(256), primary_key=True, index=True)
-    members = db.relationship('GroupMembership',
-                              foreign_keys=[GroupMembership.group_id],
-                              backref=db.backref('groups', lazy='joined'),
-                              lazy='dynamic',
-                              cascade='all, delete-orphan')
+    groupname = db.Column(db.String(256), index=True)
+    members = db.relationship("User",  secondary=groupmemberships)
+    description =  db.Column(db.Text)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
+    @staticmethod
+    def generate_fake(count=100):
+
+        from random import seed, randint, choice
+        import string
+        import forgery_py
+        seed()
+        for i in range(count):
+            p = PostGroup(groupname=''.join(choice(string.ascii_uppercase + string.digits) for _ in range(10)),
+                     timestamp=forgery_py.date.date(True))
+            db.session.add(p)
+            db.session.commit()
 
 
 
@@ -93,11 +131,9 @@ class User(UserMixin, db.Model):
     avatar_hash = db.Column(db.String(32))
     posts = db.relationship('Post', backref='author', lazy='dynamic')
 
-    groups = db.relationship('GroupMembership',
-                             foreign_keys=[GroupMembership.member_id],
-                             backref=db.backref('members', lazy='joined'),
-                             lazy='dynamic',
-                             cascade='all, delete-orphan')
+    groups = db.relationship("PostGroup",  secondary=groupmemberships)
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
+
 
     comments = db.relationship('Comment', backref='author', lazy='dynamic')
 
@@ -174,6 +210,14 @@ class User(UserMixin, db.Model):
             self.email.encode('utf-8')).hexdigest()
         db.session.add(self)
         return True
+
+    def can(self, permissions):
+        return self.role is not None and \
+            (self.role.permissions & permissions) == permissions
+
+    def is_administrator(self):
+        return self.can(Permission.ADMINISTER)
+
 
     def ping(self):
         self.last_seen = datetime.utcnow()

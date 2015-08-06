@@ -7,7 +7,7 @@
 {% block page_content %}
 <div class="page-header">
     {% if current_user.is_authenticated() %}
-    <h1>Hello, {{ current_user.username }}!</h1>
+    <h1>Hello {{ current_user.username }}</h1>
     {% else %}
     <h1>Labloid</h1>
     <h4>a shared lab journal using IPython notebooks and git</h4>

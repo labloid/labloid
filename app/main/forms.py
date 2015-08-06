@@ -4,7 +4,7 @@ from wtforms import StringField, TextAreaField, BooleanField, SelectField,\
 from wtforms.validators import Required, Length, Email, Regexp
 from wtforms import ValidationError
 from flask.ext.pagedown.fields import PageDownField
-from ..models import Role, User
+from ..models import GroupRole, User
 
 
 class NameForm(Form):
@@ -27,7 +27,7 @@ class EditProfileAdminForm(Form):
                                           'Usernames must have only letters, '
                                           'numbers, dots or underscores')])
     confirmed = BooleanField('Confirmed')
-    role = SelectField('Role', coerce=int)
+    role = SelectField('GroupRole', coerce=int)
     name = StringField('Real name', validators=[Length(0, 64)])
     location = StringField('Location', validators=[Length(0, 64)])
     about_me = TextAreaField('About me')
@@ -36,7 +36,7 @@ class EditProfileAdminForm(Form):
     def __init__(self, user, *args, **kwargs):
         super(EditProfileAdminForm, self).__init__(*args, **kwargs)
         self.role.choices = [(role.id, role.name)
-                             for role in Role.query.order_by(Role.name).all()]
+                             for role in GroupRole.query.order_by(GroupRole.name).all()]
         self.user = user
 
     def validate_email(self, field):

@@ -11,7 +11,7 @@ if os.path.exists('.env'):
 
 # --- import extensions and apps
 from app import create_app, db
-from app.models import User, Role, Permission, Post, Comment, GroupMembership, PostGroup
+from app.models import User, GroupRole, Permission, Post, Comment, PostGroup
 from flask.ext.script import Manager, Shell
 from flask.ext.migrate import Migrate, MigrateCommand
 
@@ -22,8 +22,8 @@ migrate = Migrate(app, db)
 
 # --- shell context
 def make_shell_context():
-    return dict(app=app, db=db, User=User, Role=Role,
-                Permission=Permission, Post=Post, Comment=Comment, PostGroup=PostGroup, GroupMembership=GroupMembership)
+    return dict(app=app, db=db, User=User, Role=GroupRole,
+                Permission=Permission, Post=Post, Comment=Comment, PostGroup=PostGroup)
 manager.add_command("shell", Shell(make_context=make_shell_context))
 
 
@@ -37,13 +37,13 @@ manager.add_command('db', MigrateCommand)
 def deploy():
     """Run deployment tasks."""
     from flask.ext.migrate import upgrade
-    from app.models import Role, User
+    from app.models import GroupRole, User
 
     # migrate database to latest revision
     upgrade()
 
     # create user roles
-    Role.insert_roles()
+    GroupRole.insert_roles()
 
     # create self-follows for all users
     User.feed_to_self()

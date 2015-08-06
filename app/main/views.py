@@ -6,7 +6,7 @@ from . import main
 from .forms import EditProfileForm, EditProfileAdminForm, PostForm,\
     CommentForm
 from .. import db
-from ..models import Permission, Role, User, Post, Comment
+from ..models import Permission, GroupRole, User, Post, Comment
 from ..decorators import admin_required, permission_required
 
 
@@ -45,22 +45,35 @@ def user(username): #TODO FIX THIS
                            pagination=pagination)
 
 
-# @main.route('/edit-profile', methods=['GET', 'POST'])
-# @login_required
-# def edit_profile():
-#     form = EditProfileForm()
-#     if form.validate_on_submit():
-#         current_user.name = form.name.data
-#         current_user.location = form.location.data
-#         current_user.about_me = form.about_me.data
-#         db.session.add(current_user)
-#         flash('Your profile has been updated.')
-#         return redirect(url_for('.user', username=current_user.username))
-#     form.name.data = current_user.name
-#     form.location.data = current_user.location
-#     form.about_me.data = current_user.about_me
-#     return render_template('edit_profile.html', form=form)
-#
+@main.route('/edit-profile', methods=['GET', 'POST'])
+@login_required
+def edit_profile():
+    form = EditProfileForm()
+    if form.validate_on_submit():
+        current_user.name = form.name.data
+        current_user.location = form.location.data
+        current_user.about_me = form.about_me.data
+        db.session.add(current_user)
+        flash('Your profile has been updated.')
+        return redirect(url_for('.user', username=current_user.username))
+    form.name.data = current_user.name
+    form.location.data = current_user.location
+    form.about_me.data = current_user.about_me
+    return render_template('edit_profile.html', form=form)
+
+@main.route('/group/<int:id>')
+@login_required
+def group(id):
+    return render_template('index.html')
+
+
+@main.route('/create-group')
+@login_required
+def create_group():
+    return render_template('index.html')
+
+
+
 #
 # @main.route('/edit-profile/<int:id>', methods=['GET', 'POST'])
 # @login_required
@@ -72,7 +85,7 @@ def user(username): #TODO FIX THIS
 #         user.email = form.email.data
 #         user.username = form.username.data
 #         user.confirmed = form.confirmed.data
-#         user.role = Role.query.get(form.role.data)
+#         user.role = GroupRole.query.get(form.role.data)
 #         user.name = form.name.data
 #         user.location = form.location.data
 #         user.about_me = form.about_me.data
