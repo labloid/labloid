@@ -35,7 +35,7 @@ def index():
     if current_user.is_authenticated():
         show_followed = bool(request.cookies.get('show_followed', ''))
     if show_followed:
-        query = current_user.followed_posts
+        query = current_user.my_articles
     else:
         query = Post.query
     pagination = query.order_by(Post.timestamp.desc()).paginate(
@@ -141,21 +141,21 @@ def edit(id):
     form.body.data = post.body
     return render_template('edit_post.html', form=form)
 
-
-@main.route('/follow/<username>')
-@login_required
-@permission_required(Permission.FOLLOW)
-def follow(username):
-    user = User.query.filter_by(username=username).first()
-    if user is None:
-        flash('Invalid user.')
-        return redirect(url_for('.index'))
-    if current_user.is_following(user):
-        flash('You are already following this user.')
-        return redirect(url_for('.user', username=username))
-    current_user.follow(user)
-    flash('You are now following %s.' % username)
-    return redirect(url_for('.user', username=username))
+#
+# @main.route('/follow/<username>')
+# @login_required
+# @permission_required(Permission.FOLLOW)
+# def follow(username):
+#     user = User.query.filter_by(username=username).first()
+#     if user is None:
+#         flash('Invalid user.')
+#         return redirect(url_for('.index'))
+#     if current_user.is_reader_of(user):
+#         flash('You are already following this user.')
+#         return redirect(url_for('.user', username=username))
+#     current_user.add_to_feed(user)
+#     flash('You are now following %s.' % username)
+#     return redirect(url_for('.user', username=username))
 
 
 @main.route('/unfollow/<username>')
@@ -166,10 +166,10 @@ def unfollow(username):
     if user is None:
         flash('Invalid user.')
         return redirect(url_for('.index'))
-    if not current_user.is_following(user):
+    if not current_user.is_reader_of(user):
         flash('You are not following this user.')
         return redirect(url_for('.user', username=username))
-    current_user.unfollow(user)
+    current_user.leave_feed(user)
     flash('You are not following %s anymore.' % username)
     return redirect(url_for('.user', username=username))
 

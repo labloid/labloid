@@ -11,7 +11,7 @@ if os.path.exists('.env'):
 
 # --- import extensions and apps
 from app import create_app, db
-from app.models import User, Grouping, Role, Permission, Post, Comment
+from app.models import User, Feed, Role, Permission, Post, Comment
 from flask.ext.script import Manager, Shell
 from flask.ext.migrate import Migrate, MigrateCommand
 
@@ -22,7 +22,7 @@ migrate = Migrate(app, db)
 
 # --- shell context
 def make_shell_context():
-    return dict(app=app, db=db, User=User, Follow=Grouping, Role=Role,
+    return dict(app=app, db=db, User=User, Follow=Feed, Role=Role,
                 Permission=Permission, Post=Post, Comment=Comment)
 manager.add_command("shell", Shell(make_context=make_shell_context))
 
@@ -46,7 +46,7 @@ def deploy():
     Role.insert_roles()
 
     # create self-follows for all users
-    User.add_self_group()
+    User.feed_to_self()
 
 
 # --- run the application

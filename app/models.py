@@ -53,13 +53,13 @@ class Role(db.Model):
 
 
 
-class Grouping(db.Model):
+class Feed(db.Model):
     __tablename__ = 'follows'
 
-    groupname = db.Column(db.String(256), primary_key=True, index=True)
-    member_id = db.Column(db.Integer, db.ForeignKey('users.id'),
+    name = db.Column(db.String(256), primary_key=True, index=True)
+    receiver_id = db.Column(db.Integer, db.ForeignKey('users.id'),
                             primary_key=True)
-    owner_id = db.Column(db.Integer, db.ForeignKey('users.id'),
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'),
                             primary_key=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -68,36 +68,39 @@ class Grouping(db.Model):
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(64), unique=True, index=True)
     username = db.Column(db.String(64), unique=True, index=True)
-    git_repo = db.Column(db.String(256), unique=True, index=True)
+    name = db.Column(db.String(64))
+
+    email = db.Column(db.String(64), unique=True, index=True)
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
+
     password_hash = db.Column(db.String(128))
     confirmed = db.Column(db.Boolean, default=False)
-    name = db.Column(db.String(64))
-    location = db.Column(db.String(64))
-    about_me = db.Column(db.Text())
+    git_repo = db.Column(db.String(256), unique=True, index=True)
+
     member_since = db.Column(db.DateTime(), default=datetime.utcnow)
     last_seen = db.Column(db.DateTime(), default=datetime.utcnow)
+
     avatar_hash = db.Column(db.String(32))
     posts = db.relationship('Post', backref='author', lazy='dynamic')
-    in_group_of = db.relationship('Grouping',
-                               foreign_keys=[Grouping.member_id],
+
+    reads = db.relationship('Audience',
+                               foreign_keys=[Feed.receiver_id],
                                backref=db.backref('member', lazy='joined'),
                                lazy='dynamic',
                                cascade='all, delete-orphan')
-    has_in_groups = db.relationship('Grouping',
-                                foreign_keys=[Grouping.owner_id],
+    feeds_to = db.relationship('Audience',
+                                foreign_keys=[Feed.sender_id],
                                 backref=db.backref('owner', lazy='joined'),
                                 lazy='dynamic',
                                 cascade='all, delete-orphan')
     comments = db.relationship('Comment', backref='author', lazy='dynamic')
 
     @staticmethod
-    def add_self_group():
+    def feed_to_self():
         for user in User.query.all():
-            if not user.is_following(user):
-                user.follow(user)
+            if not user.is_reader_of(user):
+                user.add_to_feed(user.name, user)
                 db.session.add(user)
                 db.session.commit()
 
@@ -111,7 +114,7 @@ class User(UserMixin, db.Model):
         if self.email is not None and self.avatar_hash is None:
             self.avatar_hash = hashlib.md5(
                 self.email.encode('utf-8')).hexdigest()
-        self.in_group_of.append(Grouping(followed=self))
+        self.reads.append(Feed(followed=self))
 
     @property
     def password(self):
@@ -200,28 +203,28 @@ class User(UserMixin, db.Model):
         return '{url}/{hash}?s={size}&d={default}&r={rating}'.format(
             url=url, hash=hash, size=size, default=default, rating=rating)
 
-    def follow(self, user):
-        if not self.is_following(user):
-            f = Grouping(groupname=self.name, owner=self, member=user)
+    def add_to_feed(self, user, name):
+        if not self.is_reader_of(user):
+            f = Feed(name=name, reads=self, feeds_to=user)
             db.session.add(f)
 
-    def unfollow(self, user):
-        f = self.in_group_of.filter_by(followed_id=user.id).first()
+    def leave_feed(self, user, name):
+        f = self.reads.filter_by(sender_id=user.id, name=name).first()
         if f:
             db.session.delete(f)
 
-    def is_following(self, user):
-        return self.in_group_of.filter_by(
+    def is_reader_of(self, user):
+        return self.reads.filter_by(
             followed_id=user.id).first() is not None
 
-    def is_followed_by(self, user):
-        return self.has_in_groups.filter_by(
-            follower_id=user.id).first() is not None
+    def writes_for(self, user):
+        return self.feeds_to.filter_by(
+            receiver_id=user.id).first() is not None
 
     @property
-    def followed_posts(self):
-        return Post.query.join(Grouping, Grouping.owner_id == Post.author_id)\
-            .filter(Grouping.member_id == self.id)
+    def my_articles(self):
+        return Post.query.join(Feed, Feed.sender_id == Post.author_id)\
+            .filter(Feed.receiver_id == self.id)
 
     def to_json(self):
         json_user = {
