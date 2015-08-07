@@ -89,15 +89,17 @@ class GroupMemberShip(db.Model):
     member_id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
     group_id = db.Column(db.Integer, db.ForeignKey('postgroups.id'), primary_key=True)
     grouprole_id = db.Column(db.Integer, db.ForeignKey('grouproles.id'), primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class PostGroup(db.Model):
     __tablename__ = 'postgroups'
     id = db.Column(db.Integer, primary_key=True)
     groupname = db.Column(db.String(256), index=True)
-    members = db.relationship("GroupMemberShip", backref="group", lazy='dynamic')
+    memberships = db.relationship("GroupMemberShip", backref="group", lazy='dynamic')
     description =  db.Column(db.Text)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 
 

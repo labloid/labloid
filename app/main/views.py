@@ -61,7 +61,7 @@ def edit_profile():
 @login_required
 def group(id):
     group = PostGroup().query.filter_by(id=id).first_or_404()
-    return render_template('group.html', group=group)
+    return render_template('group.html', group=group, me=current_user)
 
 
 @main.route('/create-group', methods=['GET', 'POST'])
