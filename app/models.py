@@ -24,6 +24,7 @@ class GroupRole(db.Model):
     name = db.Column(db.String(64), unique=True)
     default = db.Column(db.Boolean, default=False, index=True)
     permissions = db.Column(db.Integer)
+    memberships = db.relationship("GroupMemberShip", backref="role", lazy='dynamic')
 
     @staticmethod
     def insert_roles():
@@ -83,33 +84,20 @@ class Role(db.Model):
     def __repr__(self):
         return '<Role %r>' % self.name
 
+class GroupMemberShip(db.Model):
+    __tablename__ = 'groupmemberships'
+    member_id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
+    group_id = db.Column(db.Integer, db.ForeignKey('postgroups.id'), primary_key=True)
+    grouprole_id = db.Column(db.Integer, db.ForeignKey('grouproles.id'), primary_key=True)
 
-groupmemberships = db.Table('groupmembership',
-    db.Column('member_id', db.Integer, db.ForeignKey('users.id')),
-    db.Column('group_id',  db.Integer, db.ForeignKey('postgroup.id')),
-    db.Column('grouprole_id', db.Integer, db.ForeignKey('grouproles.id'))
-)
 
 class PostGroup(db.Model):
-    __tablename__ = 'postgroup'
+    __tablename__ = 'postgroups'
     id = db.Column(db.Integer, primary_key=True)
     groupname = db.Column(db.String(256), index=True)
-    members = db.relationship("User",  secondary=groupmemberships)
+    members = db.relationship("GroupMemberShip", backref="group", lazy='dynamic')
     description =  db.Column(db.Text)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-
-    @staticmethod
-    def generate_fake(count=100):
-
-        from random import seed, randint, choice
-        import string
-        import forgery_py
-        seed()
-        for i in range(count):
-            p = PostGroup(groupname=''.join(choice(string.ascii_uppercase + string.digits) for _ in range(10)),
-                     timestamp=forgery_py.date.date(True))
-            db.session.add(p)
-            db.session.commit()
 
 
 
@@ -131,7 +119,7 @@ class User(UserMixin, db.Model):
     avatar_hash = db.Column(db.String(32))
     posts = db.relationship('Post', backref='author', lazy='dynamic')
 
-    groups = db.relationship("PostGroup",  secondary=groupmemberships)
+    groupmemberships = db.relationship("GroupMemberShip",  backref='user', lazy='dynamic')
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
 
 

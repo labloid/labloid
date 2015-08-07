@@ -6,7 +6,7 @@ from . import main
 from .forms import EditProfileForm, EditProfileAdminForm, PostForm,\
     CommentForm, GroupForm
 from .. import db
-from ..models import Permission, GroupRole, User, Post, Comment
+from ..models import Permission, GroupRole, User, Post, Comment, PostGroup, GroupMemberShip
 from ..decorators import admin_required, permission_required
 
 
@@ -51,14 +51,10 @@ def edit_profile():
     form = EditProfileForm()
     if form.validate_on_submit():
         current_user.name = form.name.data
-        current_user.location = form.location.data
-        current_user.about_me = form.about_me.data
         db.session.add(current_user)
         flash('Your profile has been updated.')
         return redirect(url_for('.user', username=current_user.username))
     form.name.data = current_user.name
-    form.location.data = current_user.location
-    form.about_me.data = current_user.about_me
     return render_template('edit_profile.html', form=form)
 
 @main.route('/group/<int:id>')
@@ -72,11 +68,43 @@ def group(id):
 def create_group():
     form = GroupForm()
     if form.validate_on_submit():
-        # current_user.name = form.name.data
-        # current_user.location = form.location.data
-        # current_user.about_me = form.about_me.data
-        # db.session.add(current_user)
-        # flash('Your profile has been updated.')
+
+        pg = PostGroup(groupname=form.groupname.data,
+                       description=form.description.data)
+        gm = GroupMemberShip()
+        gm.group = pg
+        gm.role = GroupRole().query.filter_by(name='Owner').first_or_404()
+        current_user.groupmemberships.append(gm)
+
+        db.session.add(pg)
+        db.session.add(gm)
+        db.session.commit()
+
+        with db.session.no_autoflush:
+
+            for invitee in map(lambda x: x.strip(), form.invites.data.split(',')):
+                if '@' in invitee:
+                    user = User().query.filter_by(email=invitee)
+                else:
+                    user = User().query.filter_by(username=invitee)
+
+                if user.count() > 0:
+                    user = user.first_or_404()
+                    gm = GroupMemberShip()
+                    gm.group = pg
+                    gm.role = GroupRole().query.filter_by(name='Reader').first_or_404()
+                    user.groupmemberships.append(gm)
+                    flash('%s has been added to %s' % (user.username, form.groupname.data))
+
+                    db.session.add(gm)
+                else:
+                    pass
+                    #TODO send out email
+            db.session.commit()
+
+        # TODO: handle invites for group with email
+
+        flash('Group %s has been created' % (form.groupname.data, ))
         return redirect(url_for('.user', username=current_user.username))
     return render_template('add_group.html', form=form)
 

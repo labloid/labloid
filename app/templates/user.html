@@ -8,6 +8,10 @@
     <img class="img-rounded profile-thumbnail" src="{{ user.gravatar(size=256) }}">
     <div class="profile-header">
         <h1>{{ user.username }}</h1>
+        <p>
+            {% if user.name %}{{ user.name }}<br>{% endif %}
+        </p>
+
         {% if current_user.is_administrator() %}
         <p><a href="mailto:{{ user.email }}">{{ user.email }}</a></p>
         {% endif %}
@@ -24,8 +28,8 @@
 
     <h3>Groups of {{ user.username }}</h3>
     <p>
-        {% for group in user.groups %}
-            <a class="btn btn-info" href="{{ url_for('.group', id=group.id) }}">{{ group.groupname }} </a>
+        {% for gm in user.groupmemberships %}
+            <a class="btn btn-info" href="{{ url_for('.group', id=gm.group_id) }}">{{ gm.group.groupname }} </a>
         {% endfor %}
 
     </p>
