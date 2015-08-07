@@ -1,13 +1,12 @@
 {% extends "base.html" %}
 {% import "_macros.html" as macros %}
 
-{% block title %}Labloid - {{ user.username }}{% endblock %}
+{% block title %}Labloid - {{ group.groupname }}{% endblock %}
 
 {% block page_content %}
 <div class="page-header">
-    <img class="img-rounded profile-thumbnail" src="{{ user.gravatar(size=256) }}">
     <div class="profile-header">
-        <h1>{{ user.username }}</h1>
+        <h1>{{ group.groupname }}</h1>
         <p>
             {% if user.name %}{{ user.name }}<br>{% endif %}
         </p>
