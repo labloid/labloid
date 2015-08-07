@@ -1,2 +1,2 @@
-# labloid
-Lab Blog with IPython notebooks and git
+# Labloid
+Lab Blog with [Jupyter notebooks](https://jupyter.org/) and [Git](https://git-scm.com/)
