@@ -1,13 +1,14 @@
-from flask import render_template, redirect, url_for, abort, flash, request,\
+from flask import render_template, redirect, url_for, abort, flash, request, \
     current_app, make_response
 from flask.ext.login import login_required, current_user
 from flask.ext.sqlalchemy import get_debug_queries
 from . import main
-from .forms import EditProfileForm, EditProfileAdminForm, PostForm,\
-    CommentForm, GroupForm
+from .forms import EditProfileForm, EditProfileAdminForm, PostForm, \
+    CommentForm, GroupForm, EditMemberShipForm, AddMembersForm
 from .. import db
 from ..models import Permission, GroupRole, User, Post, Comment, PostGroup, GroupMemberShip
 from ..decorators import admin_required, permission_required
+from .errors import forbidden
 
 
 @main.after_app_request
@@ -34,7 +35,8 @@ def index():
 
 
 @main.route('/user/<username>')
-def user(username): #TODO FIX THIS
+@login_required
+def user(username):
     user = User.query.filter_by(username=username).first_or_404()
     page = request.args.get('page', 1, type=int)
     pagination = user.posts.order_by(Post.timestamp.desc()).paginate(
@@ -57,11 +59,66 @@ def edit_profile():
     form.name.data = current_user.name
     return render_template('edit_profile.html', form=form)
 
-@main.route('/group/<int:id>')
+
+@main.route('/edit-membership/<int:user_id>/<int:group_id>', methods=['GET', 'POST'])
+@login_required
+def edit_membership(user_id, group_id):
+
+    ms = GroupMemberShip.query.filter_by(member_id=user_id, group_id=group_id).first_or_404()
+    if not ms.group.is_administrator(current_user):
+        return forbidden('You do not have the rights to edit this group!')
+
+    form = EditMemberShipForm(user_id=user_id, group_id=group_id)
+
+    if form.validate_on_submit():
+        if form.cancel.data:
+            return redirect(url_for('.group', id=group_id))
+        elif form.submit.data:
+            ms.role = GroupRole.query.get(form.role.data)
+            db.session.add(ms)
+            flash("%s's role has been updated to %s" % (ms.user.username, form.choice_map[form.role.data]))
+            return redirect(url_for('.group', id=group_id))
+        elif form.delete.data:
+            # TODO: implement delete confirmation
+            db.session.delete(ms)
+            flash("User %s has been removed from %s" % (ms.user.username, ms.group.groupname))
+            return redirect(url_for('.group', id=group_id))
+
+    return render_template('edit_membership.html', form=form)
+
+
+@main.route('/group/<int:id>',  methods=['GET', 'POST'])
 @login_required
 def group(id):
-    group = PostGroup().query.filter_by(id=id).first_or_404()
-    return render_template('group.html', group=group, me=current_user)
+    group = PostGroup.query.filter_by(id=id).first_or_404()
+    if not current_user.is_member_of(group):
+        return forbidden('You do not have the rights to see this group!')
+
+    form = AddMembersForm(group_id=id)
+    if form.validate_on_submit():
+
+        with db.session.no_autoflush:
+
+            for invitee in map(lambda x: x.strip(), form.invites.data.split(',')):
+                if '@' in invitee:
+                    user = User.query.filter_by(email=invitee)
+                else:
+                    user = User.query.filter_by(username=invitee)
+
+                if user.count() > 0:
+                    user = user.first_or_404()
+                    gm = GroupMemberShip()
+                    gm.group = form.group
+                    gm.role = GroupRole.query.filter_by(name='Reader').first_or_404()
+                    user.groupmemberships.append(gm)
+                    flash('%s has been added to %s' % (user.username, group.groupname))
+                    db.session.add(gm)
+                else:
+                    pass
+                    # TODO send out email
+            db.session.commit()
+
+    return render_template('group.html', group=group, me=current_user, form=form)
 
 
 @main.route('/create-group', methods=['GET', 'POST'])
@@ -74,7 +131,7 @@ def create_group():
                        description=form.description.data)
         gm = GroupMemberShip()
         gm.group = pg
-        gm.role = GroupRole().query.filter_by(name='Owner').first_or_404()
+        gm.role = GroupRole.query.filter_by(name='Owner').first_or_404()
         current_user.groupmemberships.append(gm)
 
         db.session.add(pg)
@@ -85,31 +142,29 @@ def create_group():
 
             for invitee in map(lambda x: x.strip(), form.invites.data.split(',')):
                 if '@' in invitee:
-                    user = User().query.filter_by(email=invitee)
+                    user = User.query.filter_by(email=invitee)
                 else:
-                    user = User().query.filter_by(username=invitee)
+                    user = User.query.filter_by(username=invitee)
 
                 if user.count() > 0:
                     user = user.first_or_404()
                     gm = GroupMemberShip()
                     gm.group = pg
-                    gm.role = GroupRole().query.filter_by(name='Reader').first_or_404()
+                    gm.role = GroupRole.query.filter_by(name='Reader').first_or_404()
                     user.groupmemberships.append(gm)
                     flash('%s has been added to %s' % (user.username, form.groupname.data))
 
                     db.session.add(gm)
                 else:
                     pass
-                    #TODO send out email
+                    # TODO send out email
             db.session.commit()
 
         # TODO: handle invites for group with email
 
-        flash('Group %s has been created' % (form.groupname.data, ))
+        flash('Group %s has been created' % (form.groupname.data,))
         return redirect(url_for('.user', username=current_user.username))
     return render_template('add_group.html', form=form)
-
-
 
 #
 # @main.route('/edit-profile/<int:id>', methods=['GET', 'POST'])

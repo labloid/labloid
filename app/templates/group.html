@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% import "_macros.html" as macros %}
+{% import "bootstrap/wtf.html" as wtf %}
 
 {% block title %}Labloid - {{ group.groupname }}{% endblock %}
 
@@ -7,22 +8,25 @@
 <div class="page-header">
     <div class="profile-header">
         <h1>Group {{ group.groupname }}</h1>
+
         <p>Founded {{ moment(group.timestamp).format('L') }}. </p>
 
         <p>{{ group.description }}</p>
     </div>
 
-
-    <table class="table table-hover followers">
+</div>
+<div  class="page-content">
+    <h2>Members</h2>
+        <table class="table table-hover followers">
         <thead>
         <tr>
             <th>User</th>
             <th>Joined</th>
             <th>Role</th>
+            <th>Edit</th>
         </tr>
         </thead>
         {% for membership in group.memberships %}
-        {% if membership.user != me %}
         <tr>
             <td>
                 <a href="{{ url_for('.user', username = membership.user.username) }}">
@@ -32,11 +36,25 @@
             </td>
             <td>{{ moment(membership.timestamp).format('L') }}</td>
             <td>{{ membership.role.name }}</td>
+            <td>
+                {% if group.is_administrator(me) %}
+                <a href="{{ url_for('.edit_membership', user_id=membership.user.id, group_id=group.id) }}">
+                    <button type="button" class="btn btn-default ">Edit Membership</button>
+                </a>
+                {% else %}
+                <button type="button" class="btn btn-default disabled">Edit Membership</button>
+                {% endif %}
+            </td>
         </tr>
-        {% endif %}
         {% endfor %}
     </table>
 
-    <!-- TODO: invite more people; delete users; -->
-  </div>
+    {% if group.is_administrator(me) %}
+    <h2>Invite More Members</h2>
+        <div class="col-md-4">
+            {{ wtf.quick_form(form) }}
+        </div>
+    {% endif %}
+
+</div>
 {% endblock %}

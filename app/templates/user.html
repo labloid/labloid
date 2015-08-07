@@ -26,6 +26,7 @@
         </p>
     </div>
 
+    <!-- TODO: Don't show groups if not user itself-->
     <h3>Groups of {{ user.username }}</h3>
     <p>
         {% for gm in user.groupmemberships %}

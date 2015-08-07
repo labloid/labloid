@@ -100,6 +100,13 @@ class PostGroup(db.Model):
     description =  db.Column(db.Text)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
+    def user_can(self, user, permissions):
+        ms = self.memberships.filter_by(member_id=user.id).first_or_404()
+        return ms.role is not None and \
+            (ms.role.permissions & permissions) == permissions
+
+    def is_administrator(self, user):
+        return self.user_can(user, Permission.ADMINISTER)
 
 
 
@@ -177,6 +184,9 @@ class User(UserMixin, db.Model):
         self.password = new_password
         db.session.add(self)
         return True
+
+    def is_member_of(self, group):
+        return GroupMemberShip().query.filter_by(group_id=group.id, member_id=self.id).count() > 0
 
     def generate_email_change_token(self, new_email, expiration=3600):
         s = Serializer(current_app.config['SECRET_KEY'], expiration)
