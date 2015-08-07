@@ -1,15 +1,10 @@
 from flask.ext.wtf import Form
 from wtforms import StringField, TextAreaField, BooleanField, SelectField,\
     SubmitField
-from wtforms.validators import Required, Length, Email, Regexp
+from wtforms.validators import required, Length, Email, Regexp
 from wtforms import ValidationError
 from flask.ext.pagedown.fields import PageDownField
 from ..models import GroupRole, User
-
-
-class NameForm(Form):
-    name = StringField('What is your name?', validators=[Required()])
-    submit = SubmitField('Submit')
 
 
 class EditProfileForm(Form):
@@ -20,17 +15,15 @@ class EditProfileForm(Form):
 
 
 class EditProfileAdminForm(Form):
-    email = StringField('Email', validators=[Required(), Length(1, 64),
+    email = StringField('Email', validators=[required(), Length(1, 64),
                                              Email()])
     username = StringField('Username', validators=[
-        Required(), Length(1, 64), Regexp('^[A-Za-z][A-Za-z0-9_.]*$', 0,
+        required(), Length(1, 64), Regexp('^[A-Za-z][A-Za-z0-9_.]*$', 0,
                                           'Usernames must have only letters, '
                                           'numbers, dots or underscores')])
     confirmed = BooleanField('Confirmed')
     role = SelectField('GroupRole', coerce=int)
     name = StringField('Real name', validators=[Length(0, 64)])
-    location = StringField('Location', validators=[Length(0, 64)])
-    about_me = TextAreaField('About me')
     submit = SubmitField('Submit')
 
     def __init__(self, user, *args, **kwargs):
@@ -51,10 +44,16 @@ class EditProfileAdminForm(Form):
 
 
 class PostForm(Form):
-    body = PageDownField("What's on your mind?", validators=[Required()])
+    body = PageDownField("What's on your mind?", validators=[required()])
     submit = SubmitField('Submit')
 
 
 class CommentForm(Form):
-    body = StringField('Enter your comment', validators=[Required()])
+    body = StringField('Enter your comment', validators=[required()])
+    submit = SubmitField('Submit')
+
+class GroupForm(Form):
+    groupname = StringField('Group Name', validators=[required(), Length(1, 64)])
+    description = StringField('Description')
+    invites = StringField('Invite Members (comma separated email adresses)')
     submit = SubmitField('Submit')

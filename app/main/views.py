@@ -4,7 +4,7 @@ from flask.ext.login import login_required, current_user
 from flask.ext.sqlalchemy import get_debug_queries
 from . import main
 from .forms import EditProfileForm, EditProfileAdminForm, PostForm,\
-    CommentForm
+    CommentForm, GroupForm
 from .. import db
 from ..models import Permission, GroupRole, User, Post, Comment
 from ..decorators import admin_required, permission_required
@@ -67,10 +67,18 @@ def group(id):
     return render_template('index.html')
 
 
-@main.route('/create-group')
+@main.route('/create-group', methods=['GET', 'POST'])
 @login_required
 def create_group():
-    return render_template('index.html')
+    form = GroupForm()
+    if form.validate_on_submit():
+        # current_user.name = form.name.data
+        # current_user.location = form.location.data
+        # current_user.about_me = form.about_me.data
+        # db.session.add(current_user)
+        # flash('Your profile has been updated.')
+        return redirect(url_for('.user', username=current_user.username))
+    return render_template('add_group.html', form=form)
 
 
 
