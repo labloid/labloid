@@ -27,22 +27,15 @@ class EditMemberShipRoleForm(Form):
 class GroupForm(Form):
     groupname = StringField('Group Name', validators=[required(), Length(1, 64)])
     description = StringField('Description')
-    invites = StringField('Invite Members', widget=TextArea(),
-                          default='comma separated email adresses or user names')
     submit = SubmitField('Submit')
 
-    def __init__(self, user, *args, **kwargs):
-        super(GroupForm, self).__init__(*args, **kwargs)
-        self.user = user
 
-    def validate_groupname(self, field):
-        if self.user.is_in_group_named(field.data):
-            raise ValidationError('User already has group named %s' % (field.data,))
 
 
 class AddMembersForm(Form):
-    invites = StringField('Invite Members', widget=TextArea(), default='comma separated email adresses or user names')
+    invites = StringField('Invite Members', widget=TextArea())
     submit = SubmitField('Invite')
+    cancel = SubmitField('Cancel')
 
     def __init__(self, group_id, *args, **kwargs):
         super(AddMembersForm, self).__init__(*args, **kwargs)
@@ -50,8 +43,16 @@ class AddMembersForm(Form):
 
     def validate_invites(self, field):
         for invitee in map(lambda x: x.strip(), field.data.split(',')):
-            if not '@' in invitee and User().query.filter_by(username=invitee).count() == 0:
-                raise ValidationError('User does not exist')
+
+            if not '@' in invitee:
+                user = User().query.filter_by(username=invitee)
+                if user.count()  == 0:
+                    raise ValidationError('User does not exist')
+                user = user.first()
+                if user in self.group.users:
+                    raise ValidationError('User %s is already in the group' % (user.username,))
+
+
 
 class ConfirmationForm(Form):
     sure = SubmitField('Yes, I am sure!')

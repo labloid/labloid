@@ -117,6 +117,11 @@ class PostGroup(db.Model):
             ret += self.user_can(gm.user, Permission.ADMINISTER)
         return ret
 
+    @property
+    def users(self):
+        return [e.user for e in self.memberships.filter_by(group_id=self.id).all()]
+
+
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
