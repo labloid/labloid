@@ -34,6 +34,9 @@ def create_app(config_name):
         from flask.ext.sslify import SSLify
         sslify = SSLify(app)
 
+    from .groups import groups as group_blueprint
+    app.register_blueprint(group_blueprint)
+
     from .main import main as main_blueprint
     app.register_blueprint(main_blueprint)
 

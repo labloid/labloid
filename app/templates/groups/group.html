@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% import "_macros.html" as macros %}
 {% import "bootstrap/wtf.html" as wtf %}
 
 {% block title %}Labloid - {{ group.groupname }}{% endblock %}
@@ -29,7 +28,7 @@
         {% for membership in group.memberships %}
         <tr>
             <td>
-                <a href="{{ url_for('.user', username = membership.user.username) }}">
+                <a href="{{ url_for('main.user', username = membership.user.username) }}">
                     <img class="img-rounded" src="{{ membership.user.gravatar(size=32) }}">
                     {{ membership.user.username }}
                 </a>

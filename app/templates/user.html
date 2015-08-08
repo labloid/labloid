@@ -10,6 +10,10 @@
         <h1>{{ user.username }}</h1>
         <p>
             {% if user.name %}{{ user.name }}<br>{% endif %}
+            {% if user.location %}
+                From <a href="http://maps.google.com/?q={{ user.location }}">{{ user.location }}</a><br>
+            {% endif %}
+
         </p>
 
         {% if current_user.is_administrator() %}
@@ -30,12 +34,12 @@
     <h3>Groups of {{ user.username }}</h3>
     <p>
         {% for gm in user.groupmemberships %}
-            <a class="btn btn-info" href="{{ url_for('.group', id=gm.group_id) }}">{{ gm.group.groupname }} </a>
+            <a class="btn btn-info" href="{{ url_for('groups.group', id=gm.group_id) }}">{{ gm.group.groupname }} </a>
         {% endfor %}
     </p>
     <p>
         {% if user == current_user %}
-            <a class="btn btn-default" href="{{ url_for('.create_group') }}">Create New Group</a>
+            <a class="btn btn-default" href="{{ url_for('groups.create_group') }}">Create New Group</a>
         {% endif %}
     </p>
 

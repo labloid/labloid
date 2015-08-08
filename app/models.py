@@ -17,7 +17,6 @@ class Permission:
     MODERATE_COMMENTS = 0x08
     ADMINISTER = 0x80
 
-
 class GroupRole(db.Model):
     __tablename__ = 'grouproles'
     id = db.Column(db.Integer, primary_key=True)
@@ -63,12 +62,12 @@ class Role(db.Model):
     @staticmethod
     def insert_roles():
         roles = {
-            'User': (Permission.FOLLOW |
+            'User': (Permission.READ |
                      Permission.COMMENT |
-                     Permission.WRITE_ARTICLES, True),
-            'Moderator': (Permission.FOLLOW |
+                     Permission.POST, True),
+            'Moderator': (Permission.READ |
                           Permission.COMMENT |
-                          Permission.WRITE_ARTICLES |
+                          Permission.POST |
                           Permission.MODERATE_COMMENTS, False),
             'Administrator': (0xff, False)
         }
@@ -95,6 +94,7 @@ class GroupMemberShip(db.Model):
 class PostGroup(db.Model):
     __tablename__ = 'postgroups'
     id = db.Column(db.Integer, primary_key=True)
+    owner = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True, backref='my_groups')
     groupname = db.Column(db.String(256), index=True)
     memberships = db.relationship("GroupMemberShip", backref="group", lazy='dynamic')
     description =  db.Column(db.Text)
@@ -121,6 +121,9 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(128))
     confirmed = db.Column(db.Boolean, default=False)
     git_repo = db.Column(db.String(256), unique=True, index=True)
+
+    location = db.Column(db.String(64))
+
 
     member_since = db.Column(db.DateTime(), default=datetime.utcnow)
     last_seen = db.Column(db.DateTime(), default=datetime.utcnow)
