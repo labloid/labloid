@@ -90,6 +90,10 @@ class GroupMemberShip(db.Model):
     grouprole_id = db.Column(db.Integer, db.ForeignKey('grouproles.id'), primary_key=True)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
+    def member_can(self, permissions):
+        return self.role is not None and \
+            (self.role.permissions & permissions) == permissions
+
 
 class PostGroup(db.Model):
     __tablename__ = 'postgroups'

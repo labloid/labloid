@@ -7,14 +7,13 @@ from flask.ext.pagedown.fields import PageDownField
 from wtforms.widgets import TextArea
 from ..models import GroupRole, User, PostGroup, GroupMemberShip
 
-class EditMemberShipForm(Form):
+class EditMemberShipRoleForm(Form):
     role = SelectField('Role', coerce=int)
     submit = SubmitField('Submit')
-    delete = SubmitField('Delete')
     cancel = SubmitField('Cancel')
 
     def __init__(self, user_id, group_id, *args, **kwargs):
-        super(EditMemberShipForm, self).__init__(*args, **kwargs)
+        super(EditMemberShipRoleForm, self).__init__(*args, **kwargs)
         self.user = User.query.filter_by(id=user_id).first_or_404()
         self.group = PostGroup.query.filter_by(id=group_id).first_or_404()
 
@@ -22,7 +21,6 @@ class EditMemberShipForm(Form):
                              for role in GroupRole.query.order_by(GroupRole.name).all()]
         self.membership = GroupMemberShip.query.filter_by(member_id=user_id, group_id=group_id).first_or_404()
         self.choice_map = dict(self.role.choices)
-        self.role.data = self.membership.grouprole_id
 
 
 
@@ -55,6 +53,6 @@ class AddMembersForm(Form):
             if not '@' in invitee and User().query.filter_by(username=invitee).count() == 0:
                 raise ValidationError('User does not exist')
 
-class DeleteGroupForm(Form):
+class ConfirmationForm(Form):
     sure = SubmitField('Yes, I am sure!')
     cancel = SubmitField('No, take me back!')

@@ -3,42 +3,66 @@ from flask import render_template, redirect, url_for, abort, flash, request, \
 from flask.ext.login import login_required, current_user
 from flask.ext.sqlalchemy import get_debug_queries
 from . import groups
-from .forms import GroupForm, EditMemberShipForm, AddMembersForm, DeleteGroupForm
+from .forms import GroupForm, EditMemberShipRoleForm, AddMembersForm, ConfirmationForm
 from .. import db
 from ..models import Permission, GroupRole, User, Post, Comment, PostGroup, GroupMemberShip
 from .errors import forbidden
 from .decorators import group_permission_required
 
-@groups.route('/edit-membership/<int:user_id>/<int:group_id>', methods=['GET', 'POST'])
+@groups.route('/edit-membership/<int:group_id>/<int:user_id>', methods=['GET', 'POST'])
 @login_required
-def edit_membership(user_id, group_id):
-    # if user_id = my_id add a leave group but only if I am not the owner and if there are other owners
-    # if user_id ~= my_id only delete users if I can administer
-    # Only allow to change the role if I can administer
+@group_permission_required(Permission.ADMINISTER, groupvar='group_id')
+def edit_membership_role(user_id, group_id):
     # invite more members only if I can administer
-    # if I am owner or admin, delete group
 
     ms = GroupMemberShip.query.filter_by(member_id=user_id, group_id=group_id).first_or_404()
-    if not ms.group.is_administrator(current_user):
-        return forbidden('You do not have the rights to edit this group!')
 
-    form = EditMemberShipForm(user_id=user_id, group_id=group_id)
+    form = EditMemberShipRoleForm(user_id=user_id, group_id=group_id)
 
     if form.validate_on_submit():
         if form.cancel.data:
             return redirect(url_for('.group', id=group_id))
         elif form.submit.data:
-            ms.role = GroupRole.query.get(form.role.data)
-            db.session.add(ms)
-            flash("%s's role has been updated to %s" % (ms.user.username, form.choice_map[form.role.data]))
-            return redirect(url_for('.group', id=group_id))
-        elif form.delete.data:
-            # TODO: implement delete confirmation
-            db.session.delete(ms)
-            flash("User %s has been removed from %s" % (ms.user.username, ms.group.groupname))
-            return redirect(url_for('.group', id=group_id))
+            if ms.member_can(Permission.ADMINISTER) \
+                    and GroupRole.query.filter_by(id=form.role.data).first().name != 'Owner' \
+                    and form.group.count_administrators() < 2:
+                flash("A group needs at least one owner.")
+            else:
+                ms.role = GroupRole.query.get(form.role.data)
+                db.session.add(ms)
+                flash("%s's role has been updated to %s" % (ms.user.username, form.choice_map[form.role.data]))
+                return redirect(url_for('.group', id=group_id))
+    else:
+        form.role.data = ms.grouprole_id
 
     return render_template('edit_membership.html', form=form)
+
+@groups.route('/delete-membership/<int:group_id>/<int:user_id>', methods=['GET', 'POST'])
+@login_required
+@group_permission_required(Permission.ADMINISTER, groupvar='group_id')
+def delete_membership(group_id, user_id):
+    group = PostGroup.query.filter_by(id=group_id).first_or_404()
+    user = User.query.filter_by(id=user_id).first_or_404()
+    gm =  GroupMemberShip.query.filter_by(group_id=group_id, member_id=user_id).first_or_404()
+
+    # we don't want to delete the last administrator
+    if gm.member_can(Permission.ADMINISTER) and group.count_administrators() < 2:
+        flash("You don't want to delete the last administrator.")
+        return redirect(url_for('.group', id=group_id))
+
+
+    form = ConfirmationForm()
+    if form.validate_on_submit():
+        if form.sure.data:
+            gm =  GroupMemberShip.query.filter_by(group_id=group_id, member_id=user_id).first_or_404()
+            db.session.delete(gm)
+            flash('%s has been deleted from %s' % (gm.user.username, gm.group.groupname))
+            return redirect(url_for('main.user', username=current_user.username))
+        else:
+            return redirect(url_for('.group', id=group_id))
+
+    return render_template('groups/delete_membership.html', form=form)
+
 
 
 @groups.route('/group/<int:id>',  methods=['GET', 'POST'])
@@ -125,11 +149,8 @@ def create_group():
 @group_permission_required(Permission.ADMINISTER, groupvar='group_id')
 def delete_group(group_id):
     group = PostGroup.query.filter_by(id=group_id).first_or_404()
-    if not group.is_administrator(current_user):
-        flash('Only Owners can delete a group.')
-        return redirect(request.referrer or url_for('index'))
 
-    form = DeleteGroupForm()
+    form = ConfirmationForm()
     if form.validate_on_submit():
         if form.sure.data:
             for gm in group.memberships:

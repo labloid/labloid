@@ -23,7 +23,7 @@
             <th>User</th>
             <th>Joined</th>
             <th>Role</th>
-            <th>Edit</th>
+            <th>Allowed Actions</th>
         </tr>
         </thead>
         {% for membership in group.memberships %}
@@ -35,14 +35,23 @@
                 </a>
             </td>
             <td>{{ moment(membership.timestamp).format('L') }}</td>
-            <td>{{ membership.role.name }}</td>
             <td>
                 {% if group.is_administrator(me) %}
-                <a href="{{ url_for('.edit_membership', user_id=membership.user.id, group_id=group.id) }}">
-                    <button type="button" class="btn btn-default ">Edit Membership</button>
+                <a href="{{ url_for('.edit_membership_role', user_id=membership.user.id, group_id=group.id) }}">
+                    <button type="button" class="btn btn-default ">{{ membership.role.name }}</button>
                 </a>
-                {% else %}
-                <button type="button" class="btn btn-default disabled">Edit Membership</button>
+               {% else %}
+                    <button type="button" class="btn btn-default disabled">{{ membership.role.name }}</button>
+                {% endif %}
+
+            </td>
+            <td>
+                {% if group.is_administrator(me) %}
+                 <a href="{{ url_for('.delete_membership', user_id=membership.user.id, group_id=group.id) }}">
+                    <button type="button" class="btn btn-danger ">Remove from Group</button>
+                </a>
+               {% else %}
+                    <button type="button" class="btn btn-default disabled">Remove from Group</button>
                 {% endif %}
             </td>
         </tr>
