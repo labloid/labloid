@@ -63,6 +63,33 @@ def delete_membership(group_id, user_id):
 
     return render_template('groups/delete_membership.html', form=form)
 
+@groups.route('/leave-group/<int:group_id>', methods=['GET', 'POST'])
+@login_required
+def leave_group(group_id):
+    group = PostGroup.query.filter_by(id=group_id).first_or_404()
+
+    if not current_user in group.users:
+        flash("You can't leave a group you are not a member of.")
+        return redirect(url_for('main.user', username=current_user.username))
+
+    gm = group.memberships.filter_by(member_id=current_user.id).first_or_404()
+
+    # we don't want to delete the last administrator
+    if gm.member_can(Permission.ADMINISTER) and group.count_administrators() < 2:
+        flash("You can't leave. You are the last administrator.")
+        return redirect(url_for('.group', id=group_id))
+
+    form = ConfirmationForm()
+    if form.validate_on_submit():
+        if form.sure.data:
+            db.session.delete(gm)
+            flash('You have left from %s' % (gm.group.groupname, ))
+            return redirect(url_for('main.user', username=current_user.username))
+        else:
+            return redirect(url_for('.group', id=group_id))
+
+    return render_template('groups/leave_group.html', form=form)
+
 
 
 @groups.route('/group/<int:id>',  methods=['GET', 'POST'])

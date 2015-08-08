@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% import "bootstrap/wtf.html" as wtf %}
+
+{% block title %}Labloid - Leave Group{% endblock %}
+
+{% block page_content %}
+<div class="page-header">
+    <h1>Leave Group</h1>
+</div>
+
+<p>Are you sure you want to leave this group? The operation cannot be reversed.</p>
+
+<div class="col-md-4">
+    {{ wtf.quick_form(form) }}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+{% endblock %}
