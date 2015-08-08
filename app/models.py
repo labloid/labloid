@@ -94,7 +94,6 @@ class GroupMemberShip(db.Model):
 class PostGroup(db.Model):
     __tablename__ = 'postgroups'
     id = db.Column(db.Integer, primary_key=True)
-    owner = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True, backref='my_groups')
     groupname = db.Column(db.String(256), index=True)
     memberships = db.relationship("GroupMemberShip", backref="group", lazy='dynamic')
     description =  db.Column(db.Text)
@@ -108,7 +107,11 @@ class PostGroup(db.Model):
     def is_administrator(self, user):
         return self.user_can(user, Permission.ADMINISTER)
 
-
+    def count_administrators(self):
+        ret = 0
+        for gm in self.memberships:
+            ret += self.user_can(gm.user, Permission.ADMINISTER)
+        return ret
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
@@ -190,6 +193,14 @@ class User(UserMixin, db.Model):
 
     def is_member_of(self, group):
         return GroupMemberShip().query.filter_by(group_id=group.id, member_id=self.id).count() > 0
+
+    def is_in_group_named(self, groupname):
+        for gm in GroupMemberShip().query.filter_by(member_id=self.id).all():
+            if gm.group.groupname.lower() == groupname.lower():
+                return True
+        return False
+
+
 
     def generate_email_change_token(self, new_email, expiration=3600):
         s = Serializer(current_app.config['SECRET_KEY'], expiration)

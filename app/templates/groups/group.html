@@ -5,18 +5,19 @@
 
 {% block page_content %}
 <div class="page-header">
-    <div class="profile-header">
+    <div class="jumbotron">
         <h1>Group {{ group.groupname }}</h1>
-
         <p>Founded {{ moment(group.timestamp).format('L') }}. </p>
 
         <p>{{ group.description }}</p>
     </div>
 
 </div>
-<div  class="page-content">
+<div class="page-content">
     <h2>Members</h2>
-        <table class="table table-hover followers">
+
+    <p>
+    <table class="table table-striped followers">
         <thead>
         <tr>
             <th>User</th>
@@ -47,13 +48,16 @@
         </tr>
         {% endfor %}
     </table>
-
+    </p>
     {% if group.is_administrator(me) %}
-    <h2>Invite More Members</h2>
-        <div class="col-md-4">
-            {{ wtf.quick_form(form) }}
-        </div>
-    {% endif %}
+    <h2>Danger Zone</h2>
 
+    <p>
+        <a href="{{ url_for('.delete_group', group_id = group.id) }}">
+            <button type="button" class="btn btn-danger ">Delete Group</button>
+        </a>
+
+    </p>
+    {% endif %}
 </div>
 {% endblock %}

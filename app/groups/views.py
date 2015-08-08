@@ -3,12 +3,11 @@ from flask import render_template, redirect, url_for, abort, flash, request, \
 from flask.ext.login import login_required, current_user
 from flask.ext.sqlalchemy import get_debug_queries
 from . import groups
-from .forms import GroupForm, EditMemberShipForm, AddMembersForm
+from .forms import GroupForm, EditMemberShipForm, AddMembersForm, DeleteGroupForm
 from .. import db
 from ..models import Permission, GroupRole, User, Post, Comment, PostGroup, GroupMemberShip
-from ..decorators import admin_required, permission_required
 from .errors import forbidden
-
+from .decorators import group_permission_required
 
 @groups.route('/edit-membership/<int:user_id>/<int:group_id>', methods=['GET', 'POST'])
 @login_required
@@ -49,37 +48,37 @@ def group(id):
     if not current_user.is_member_of(group):
         return forbidden('You do not have the rights to see this group!')
 
-    form = AddMembersForm(group_id=id)
-    if form.validate_on_submit():
+    # form = AddMembersForm(group_id=id)
+    # if form.validate_on_submit():
+    #
+    #     with db.session.no_autoflush:
+    #
+    #         for invitee in map(lambda x: x.strip(), form.invites.data.split(',')):
+    #             if '@' in invitee:
+    #                 user = User.query.filter_by(email=invitee)
+    #             else:
+    #                 user = User.query.filter_by(username=invitee)
+    #
+    #             if user.count() > 0:
+    #                 user = user.first_or_404()
+    #                 gm = GroupMemberShip()
+    #                 gm.group = form.group
+    #                 gm.role = GroupRole.query.filter_by(name='Reader').first_or_404()
+    #                 user.groupmemberships.append(gm)
+    #                 flash('%s has been added to %s' % (user.username, group.groupname))
+    #                 db.session.add(gm)
+    #             else:
+    #                 pass
+    #                 # TODO send out email
+    #         db.session.commit()
 
-        with db.session.no_autoflush:
-
-            for invitee in map(lambda x: x.strip(), form.invites.data.split(',')):
-                if '@' in invitee:
-                    user = User.query.filter_by(email=invitee)
-                else:
-                    user = User.query.filter_by(username=invitee)
-
-                if user.count() > 0:
-                    user = user.first_or_404()
-                    gm = GroupMemberShip()
-                    gm.group = form.group
-                    gm.role = GroupRole.query.filter_by(name='Reader').first_or_404()
-                    user.groupmemberships.append(gm)
-                    flash('%s has been added to %s' % (user.username, group.groupname))
-                    db.session.add(gm)
-                else:
-                    pass
-                    # TODO send out email
-            db.session.commit()
-
-    return render_template('groups/group.html', group=group, me=current_user, form=form)
+    return render_template('groups/group.html', group=group, me=current_user)
 
 
 @groups.route('/create-group', methods=['GET', 'POST'])
 @login_required
 def create_group():
-    form = GroupForm()
+    form = GroupForm(current_user)
     if form.validate_on_submit():
 
         pg = PostGroup(groupname=form.groupname.data,
@@ -120,3 +119,25 @@ def create_group():
         flash('Group %s has been created' % (form.groupname.data,))
         return redirect(url_for('main.user', username=current_user.username))
     return render_template('groups/add_group.html', form=form)
+
+@groups.route('/delete-group/<int:group_id>', methods=['GET', 'POST'])
+@login_required
+@group_permission_required(Permission.ADMINISTER, groupvar='group_id')
+def delete_group(group_id):
+    group = PostGroup.query.filter_by(id=group_id).first_or_404()
+    if not group.is_administrator(current_user):
+        flash('Only Owners can delete a group.')
+        return redirect(request.referrer or url_for('index'))
+
+    form = DeleteGroupForm()
+    if form.validate_on_submit():
+        if form.sure.data:
+            for gm in group.memberships:
+                db.session.delete(gm)
+            db.session.delete(group)
+            flash('Group %s has been deleted' % (group.groupname, ))
+            return redirect(url_for('main.user', username=current_user.username))
+        else:
+            return redirect(url_for('.group', id=group_id))
+
+    return render_template('groups/delete_group.html', form=form)
