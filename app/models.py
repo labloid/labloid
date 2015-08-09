@@ -184,6 +184,22 @@ class User(UserMixin, db.Model):
         db.session.add(self)
         return True
 
+    @staticmethod
+    def user_from_token(token):
+        s = Serializer(current_app.config['SECRET_KEY'])
+        try:
+            data = s.loads(token)
+        except BadSignature:
+            abort(403)
+        user = User.query.filter_by(id=data['confirm']).first_or_404()
+        return user
+
+    @staticmethod
+    def confirm_user(token):
+        user = User.user_from_token(token)
+        return user.confirm(token)
+
+
     def generate_reset_token(self, expiration=3600):
         s = Serializer(current_app.config['SECRET_KEY'], expiration)
         return s.dumps({'reset': self.id})
