@@ -5,7 +5,7 @@ from flask.ext.sqlalchemy import get_debug_queries
 from . import groups
 from .forms import GroupForm, EditMemberShipRoleForm, AddMembersForm, ConfirmationForm
 from .. import db
-from ..models import Permission, GroupRole, User, Post, Comment, PostGroup, GroupMemberShip
+from ..models import Permission, GroupRole, User, Post, Comment, PostGroup, GroupMemberShip, GroupInvite
 from .errors import forbidden
 from .decorators import group_permission_required
 
@@ -170,29 +170,44 @@ def add_group_members(group_id):
 
     form = AddMembersForm(group_id)
     if form.validate_on_submit():
-
         with db.session.no_autoflush:
-
             for invitee in map(lambda x: x.strip(), form.invites.data.split(',')):
+                kwargs = {'group_id':group_id}
                 if '@' in invitee:
-                    user = User.query.filter_by(email=invitee)
+                    kwargs['email'] = invitee
                 else:
                     user = User.query.filter_by(username=invitee)
-
-                if user.count() > 0:
                     user = user.first_or_404()
-                    gm = GroupMemberShip()
-                    gm.group = form.group
-                    gm.role = GroupRole.query.filter_by(name='Reader').first_or_404()
-                    user.groupmemberships.append(gm)
-                    flash('%s has been added to %s' % (user.username, form.group.groupname))
-                    db.session.add(gm)
-                else:
-                    pass
-                    # TODO send out email
-            db.session.commit()
+                    kwargs['email'] = user.email
+                    kwargs['user_id'] = user.id
 
-        # TODO: handle invites for group with email
+                gi = GroupInvite(**kwargs)
+                # gm = GroupMemberShip()
+                # gm.group = form.group
+                # gm.role = GroupRole.query.filter_by(name='Reader').first_or_404()
+                # user.groupmemberships.append(gm)
+                flash('A invitation to join %s has been sent to %s' % (form.group.groupname, kwargs['email']))
+                db.session.add(gi)
+
+            db.session.commit()
 
         return redirect(url_for('.group', id=form.group.id))
     return render_template('groups/add_members.html', form=form)
+
+
+
+@groups.route('/confirm-group/<token>')
+def confirm_group(token):
+    if GroupInvite.confirm(token, current_user):
+        flash('Groupmembership confirmed!')
+    else:
+        flash('The confirmation link is invalid or has expired.')
+    return redirect(url_for('main.user', username=current_user.username))
+
+@groups.route('/decline-invite/<token>')
+def decline_invite(token):
+    if GroupInvite.decline(token):
+        flash('Invite declined!')
+    else:
+        flash('The confirmation link is invalid or has expired.')
+    return redirect(url_for('main.user', username=current_user.username))

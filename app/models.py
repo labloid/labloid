@@ -17,6 +17,7 @@ class Permission:
     MODERATE_COMMENTS = 0x08
     ADMINISTER = 0x80
 
+
 class GroupRole(db.Model):
     __tablename__ = 'grouproles'
     id = db.Column(db.Integer, primary_key=True)
@@ -31,8 +32,8 @@ class GroupRole(db.Model):
             'Reader': (Permission.READ |
                        Permission.COMMENT, True),
             'Poster': (Permission.READ |
-                     Permission.COMMENT |
-                     Permission.POST, True),
+                       Permission.COMMENT |
+                       Permission.POST, True),
             'Moderator': (Permission.READ |
                           Permission.COMMENT |
                           Permission.POST |
@@ -48,8 +49,13 @@ class GroupRole(db.Model):
             db.session.add(role)
         db.session.commit()
 
+    @staticmethod
+    def get_id_for(name):
+        return GroupRole.query.filter_by(name=name).first_or_404().id
+
     def __repr__(self):
         return '<GroupRole %r>' % self.name
+
 
 class Role(db.Model):
     __tablename__ = 'roles'
@@ -83,6 +89,7 @@ class Role(db.Model):
     def __repr__(self):
         return '<Role %r>' % self.name
 
+
 class GroupMemberShip(db.Model):
     __tablename__ = 'groupmemberships'
     member_id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
@@ -92,7 +99,46 @@ class GroupMemberShip(db.Model):
 
     def member_can(self, permissions):
         return self.role is not None and \
-            (self.role.permissions & permissions) == permissions
+               (self.role.permissions & permissions) == permissions
+
+
+class GroupInvite(db.Model):
+    __tablename__ = "groupinvites"
+    group_id = db.Column(db.Integer, db.ForeignKey('postgroups.id'), primary_key=True)
+    email = db.Column(db.String(64), index=True, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    def generate_confirmation_token(self, expiration=3600):
+        s = Serializer(current_app.config['SECRET_KEY'], expiration)
+        return s.dumps({'confirm': self.email, 'group': self.group_id})
+
+    @staticmethod
+    def confirm(token, user):
+        s = Serializer(current_app.config['SECRET_KEY'])
+        try:
+            data = s.loads(token)
+        except:
+            return False
+
+        invite = GroupInvite.query.filter_by(email=data['confirm'], group_id=data['group']).first_or_404()
+        with db.session.no_autoflush:
+            gm = GroupMemberShip(member_id=user.id, group_id=invite.group_id,
+                                 grouprole_id=GroupRole.get_id_for('Reader'))
+            db.session.add(gm)
+            db.session.delete(invite)
+        return True
+
+    @staticmethod
+    def decline(token):
+        s = Serializer(current_app.config['SECRET_KEY'])
+        try:
+            data = s.loads(token)
+        except:
+            return False
+
+        invite = GroupInvite.query.filter_by(email=data['confirm'], group_id=data['group']).first_or_404()
+        db.session.delete(invite)
+        return True
 
 
 class PostGroup(db.Model):
@@ -100,13 +146,14 @@ class PostGroup(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     groupname = db.Column(db.String(256), index=True)
     memberships = db.relationship("GroupMemberShip", backref="group", lazy='dynamic')
-    description =  db.Column(db.Text)
+    invites = db.relationship("GroupInvite", backref="group", lazy='dynamic')
+    description = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
     def user_can(self, user, permissions):
         ms = self.memberships.filter_by(member_id=user.id).first_or_404()
         return ms.role is not None and \
-            (ms.role.permissions & permissions) == permissions
+               (ms.role.permissions & permissions) == permissions
 
     def is_administrator(self, user):
         return self.user_can(user, Permission.ADMINISTER)
@@ -136,19 +183,18 @@ class User(UserMixin, db.Model):
 
     location = db.Column(db.String(64))
 
-
     member_since = db.Column(db.DateTime(), default=datetime.utcnow)
     last_seen = db.Column(db.DateTime(), default=datetime.utcnow)
 
     avatar_hash = db.Column(db.String(32))
     posts = db.relationship('Post', backref='author', lazy='dynamic')
 
-    groupmemberships = db.relationship("GroupMemberShip",  backref='user', lazy='dynamic')
+    groupmemberships = db.relationship("GroupMemberShip", backref='user', lazy='dynamic')
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
-
 
     comments = db.relationship('Comment', backref='author', lazy='dynamic')
 
+    invites = db.relationship("GroupInvite", backref="user", lazy='dynamic')
 
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)
@@ -199,7 +245,6 @@ class User(UserMixin, db.Model):
         user = User.user_from_token(token)
         return user.confirm(token)
 
-
     def generate_reset_token(self, expiration=3600):
         s = Serializer(current_app.config['SECRET_KEY'], expiration)
         return s.dumps({'reset': self.id})
@@ -224,8 +269,6 @@ class User(UserMixin, db.Model):
             if gm.group.groupname.lower() == groupname.lower():
                 return True
         return False
-
-
 
     def generate_email_change_token(self, new_email, expiration=3600):
         s = Serializer(current_app.config['SECRET_KEY'], expiration)
@@ -252,11 +295,10 @@ class User(UserMixin, db.Model):
 
     def can(self, permissions):
         return self.role is not None and \
-            (self.role.permissions & permissions) == permissions
+               (self.role.permissions & permissions) == permissions
 
     def is_administrator(self):
         return self.can(Permission.ADMINISTER)
-
 
     def ping(self):
         self.last_seen = datetime.utcnow()
@@ -300,7 +342,7 @@ class Post(db.Model):
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     author_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     comments = db.relationship('Comment', backref='post', lazy='dynamic')
-    #TODO: GROUPS
+    # TODO: GROUPS
     @staticmethod
     def on_changed_body(target, value, oldvalue, initiator):
         allowed_tags = ['a', 'abbr', 'acronym', 'b', 'blockquote', 'code',

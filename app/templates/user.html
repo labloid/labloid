@@ -30,6 +30,36 @@
         </p>
     </div>
 
+    {% if user.invites.count() > 0 %}
+        <h3>Pending Group Invites</h3>
+    <p>
+    <table class="table table-striped followers">
+        <thead>
+        <tr>
+            <th>Group</th>
+            <th>Actions</th>
+        </tr>
+        </thead>
+            {% for gi in user.invites %}
+                <tr>
+                    <td>
+                        {{ gi.group.groupname }}
+                    </td>
+                    <td>
+                         <a href="{{ url_for('groups.confirm_group', token=gi.generate_confirmation_token()) }}">
+                            <button type="button" class="btn btn-default ">Confirm</button>
+                        </a>
+                         <a href="{{ url_for('groups.decline_invite', token=gi.generate_confirmation_token()) }}">
+                            <button type="button" class="btn btn-default ">Decline</button>
+                        </a>
+                    </td>
+                </tr>
+        {% endfor %}
+    </table>
+    </p>
+
+    {% endif %}
+
     <!-- TODO: Don't show groups if not user itself-->
     <h3>Groups of {{ user.username }}</h3>
     <p>
@@ -42,6 +72,7 @@
             <a class="btn btn-default" href="{{ url_for('groups.create_group') }}">Create New Group</a>
         {% endif %}
     </p>
+
 
 </div>
 

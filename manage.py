@@ -11,7 +11,7 @@ if os.path.exists('.env'):
 
 # --- import extensions and apps
 from app import create_app, db
-from app.models import User, GroupRole, Permission, Post, Comment, PostGroup, GroupMemberShip, Role
+from app.models import User, GroupRole, Permission, Post, Comment, PostGroup, GroupMemberShip, Role, GroupInvite
 from flask.ext.script import Manager, Shell
 from flask.ext.migrate import Migrate, MigrateCommand
 from app import mail
@@ -24,7 +24,7 @@ migrate = Migrate(app, db)
 def make_shell_context():
     return dict(app=app, db=db, User=User, Role=Role, GroupRole=GroupRole,
                 Permission=Permission, Post=Post, Comment=Comment, PostGroup=PostGroup,
-                GroupMemberShip=GroupMemberShip, mail=mail)
+                GroupMemberShip=GroupMemberShip, GroupInvite=GroupInvite)
 manager.add_command("shell", Shell(make_context=make_shell_context))
 
 
