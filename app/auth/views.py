@@ -1,4 +1,4 @@
-from flask import render_template, redirect, request, url_for, flash
+from flask import render_template, redirect, request, url_for, flash, current_app
 from flask.ext.login import login_user, logout_user, login_required, \
     current_user
 from . import auth
@@ -6,7 +6,7 @@ from .. import db
 from ..models import User
 from ..email import send_email
 from .forms import LoginForm, RegistrationForm, ChangePasswordForm,\
-    PasswordResetRequestForm, PasswordResetForm, ChangeEmailForm
+    PasswordResetRequestForm, PasswordResetForm, ChangeEmailForm, TokenRegistrationForm
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
 from itsdangerous import BadSignature
 
@@ -45,6 +45,32 @@ def logout():
     logout_user()
     flash('You have been logged out.')
     return redirect(url_for('main.index'))
+
+
+@auth.route('/register/<token>', methods=['GET', 'POST'])
+def register_with_token(token):
+    if current_user.is_authenticated():
+        logout_user()
+
+    form = TokenRegistrationForm()
+    s = Serializer(current_app.config['SECRET_KEY'])
+    try:
+        data = s.loads(token)
+    except BadSignature:
+        abort(403)
+
+
+    if form.validate_on_submit():
+        user = User(email=data['confirm'],
+                    username=form.username.data,
+                    password=form.password.data,
+                    confirmed=True)
+        db.session.add(user)
+        db.session.commit()
+        flash('User generated, please login.')
+        return redirect(url_for('auth.login'))
+    return render_template('auth/register.html', form=form)
+
 
 
 @auth.route('/register', methods=['GET', 'POST'])

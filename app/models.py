@@ -112,6 +112,11 @@ class GroupInvite(db.Model):
         s = Serializer(current_app.config['SECRET_KEY'], expiration)
         return s.dumps({'confirm': self.email, 'group': self.group_id})
 
+    @property
+    def user(self):
+        return User.query.filter_by(email=self.email).first()
+
+
     @staticmethod
     def confirm(token, user):
         s = Serializer(current_app.config['SECRET_KEY'])
@@ -194,7 +199,6 @@ class User(UserMixin, db.Model):
 
     comments = db.relationship('Comment', backref='author', lazy='dynamic')
 
-    invites = db.relationship("GroupInvite", backref="user", lazy='dynamic')
 
     def __init__(self, **kwargs):
         super(User, self).__init__(**kwargs)
@@ -202,6 +206,10 @@ class User(UserMixin, db.Model):
         if self.email is not None and self.avatar_hash is None:
             self.avatar_hash = hashlib.md5(
                 self.email.encode('utf-8')).hexdigest()
+
+    @property
+    def invites(self):
+        return GroupInvite.query.filter_by(email=self.email)
 
     @property
     def password(self):
@@ -317,6 +325,9 @@ class User(UserMixin, db.Model):
     def __repr__(self):
         return '<User %r>' % self.username
 
+    @property
+    def has_pending_invitations(self):
+        return self.invites.count() > 0
 
 class AnonymousUser(AnonymousUserMixin):
     def can(self, permissions):

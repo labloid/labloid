@@ -1,0 +1,11 @@
+Dear {{ user.name or user.username }},
+
+{{ other.name or other.username }} has invited you to join the group {{ group.groupname }} at Labloid!
+
+To confirm or decline the membership, please login at Labloid and click on you profile.
+
+Sincerely,
+
+The Labloid Team
+
+Note: replies to this email address are not monitored.

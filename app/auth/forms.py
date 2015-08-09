@@ -34,6 +34,20 @@ class RegistrationForm(Form):
         if User.query.filter_by(username=field.data).first():
             raise ValidationError('Username already in use.')
 
+class TokenRegistrationForm(Form):
+    username = StringField('Username', validators=[
+        required(), Length(1, 64), Regexp('^[A-Za-z][A-Za-z0-9_.]*$', 0,
+                                          'Usernames must have only letters, '
+                                          'numbers, dots or underscores')])
+    password = PasswordField('Password', validators=[
+        required(), EqualTo('password2', message='Passwords must match.')])
+    password2 = PasswordField('Confirm password', validators=[required()])
+    submit = SubmitField('Register')
+
+    def validate_username(self, field):
+        if User.query.filter_by(username=field.data).first():
+            raise ValidationError('Username already in use.')
+
 
 class ChangePasswordForm(Form):
     old_password = PasswordField('Old password', validators=[required()])

@@ -69,9 +69,12 @@
         {% endfor %}
     </table>
     </p>
-    <p>
-        <a class="btn btn-default" href="{{ url_for('groups.add_group_members', group_id=group.id) }}">Add Members</a>
-    </p>
+
+    {% if group.is_administrator(me) %}
+        <p>
+            <a class="btn btn-default" href="{{ url_for('groups.add_group_members', group_id=group.id) }}">Add Members</a>
+        </p>
+    {% endif %}
 
 
     {% if group.is_administrator(me) %}

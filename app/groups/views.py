@@ -8,6 +8,7 @@ from .. import db
 from ..models import Permission, GroupRole, User, Post, Comment, PostGroup, GroupMemberShip, GroupInvite
 from .errors import forbidden
 from .decorators import group_permission_required
+from ..email import send_email
 
 @groups.route('/edit-membership/<int:group_id>/<int:user_id>', methods=['GET', 'POST'])
 @login_required
@@ -170,9 +171,10 @@ def add_group_members(group_id):
 
     form = AddMembersForm(group_id)
     if form.validate_on_submit():
-        with db.session.no_autoflush:
-            for invitee in map(lambda x: x.strip(), form.invites.data.split(',')):
+        for invitee in map(lambda x: x.strip(), form.invites.data.split(',')):
+            with db.session.no_autoflush:
                 kwargs = {'group_id':group_id}
+                user_exists = False
                 if '@' in invitee:
                     kwargs['email'] = invitee
                 else:
@@ -180,12 +182,16 @@ def add_group_members(group_id):
                     user = user.first_or_404()
                     kwargs['email'] = user.email
                     kwargs['user_id'] = user.id
+                    user_exists = True
 
                 gi = GroupInvite(**kwargs)
-                # gm = GroupMemberShip()
-                # gm.group = form.group
-                # gm.role = GroupRole.query.filter_by(name='Reader').first_or_404()
-                # user.groupmemberships.append(gm)
+                if user_exists:
+                    send_email(user.email, 'You have been invited to join %s at Labloid' % (form.group.groupname, ),
+                               'groups/email/confirm', user=user, other=current_user, group=gi.group)
+                else:
+                    send_email(kwargs['email'], 'You have been invited to join Labloid',
+                               'auth/email/invitation', user=current_user, token=gi.generate_confirmation_token())
+
                 flash('A invitation to join %s has been sent to %s' % (form.group.groupname, kwargs['email']))
                 db.session.add(gi)
 
