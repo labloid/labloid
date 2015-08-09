@@ -5,19 +5,28 @@
 
 {% block page_content %}
 <div class="page-header">
-    <div class="jumbotron">
-        <h1>Group {{ group.groupname }}</h1>
-        <p>Founded {{ moment(group.timestamp).format('L') }}. </p>
+<div class="group-header">
+    <h1>Group {{ group.groupname }}
+    <small>Founded {{ moment(group.timestamp).format('L') }}.</small>
+    {% if group.is_administrator(current_user) %}
+        <small><a class="btn btn-primary pull-right" href="{{ url_for('.edit_group', group_id=group.id) }}">Edit Group</a></small>
+    {% endif %}
+    </h1>
+    <p>{{ group.description }}</p>
+    <p>
 
-        <p>{{ group.description }}</p>
-    </div>
-        <p>
-            <a class="btn btn-default" href="{{ url_for('.edit_group', group_id=group.id) }}">Edit Group</a>
-        </p>
-
+    </p>
+</div>
 </div>
 <div class="page-content">
-    <h2>Members</h2>
+    <h2>Members
+        {% if group.is_administrator(me) %}
+        <small>
+            <a class="btn btn-primary  pull-right" href="{{ url_for('groups.add_group_members', group_id=group.id) }}">Add Members</a>
+        </small>
+    {% endif %}
+
+    </h2>
 
     <p>
     <table class="table table-striped followers">
@@ -70,14 +79,10 @@
     </table>
     </p>
 
-    {% if group.is_administrator(me) %}
-        <p>
-            <a class="btn btn-default" href="{{ url_for('groups.add_group_members', group_id=group.id) }}">Add Members</a>
-        </p>
-    {% endif %}
 
 
     {% if group.is_administrator(me) %}
+    <hr class="margin-top-50">
     <h2>Danger Zone</h2>
 
     <p>

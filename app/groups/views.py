@@ -192,7 +192,7 @@ def add_group_members(group_id):
                     send_email(kwargs['email'], 'You have been invited to join Labloid',
                                'auth/email/invitation', user=current_user, token=gi.generate_confirmation_token())
 
-                flash('A invitation to join %s has been sent to %s' % (form.group.groupname, kwargs['email']))
+                flash('A invitation to join %s has been sent out.' % (form.group.groupname, ))
                 db.session.add(gi)
 
             db.session.commit()

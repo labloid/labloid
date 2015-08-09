@@ -7,9 +7,18 @@
 <div class="page-header">
     <img class="img-rounded profile-thumbnail" src="{{ user.gravatar(size=256) }}">
     <div class="profile-header">
-        <h1>{{ user.username }}</h1>
+        <h1>{{ user.username }}
+            <small>
+                {% if user.name %}{{ user.name }}{% endif %}
+                {% if user == current_user %}
+                    <a class="btn btn-primary pull-right" href="{{ url_for('.edit_profile') }}">Edit Profile</a>
+                {% elif current_user.is_administrator() %}
+                    <a class="btn btn-danger pull-right" href="{{ url_for('.edit_profile_admin', id=user.id) }}">Edit Profile [Admin]</a>
+                {% endif %}
+            </small>
+
+        </h1>
         <p>
-            {% if user.name %}{{ user.name }}<br>{% endif %}
             {% if user.location %}
                 From <a href="http://maps.google.com/?q={{ user.location }}">{{ user.location }}</a><br>
             {% endif %}
@@ -21,16 +30,10 @@
         {% endif %}
         <p>Member since {{ moment(user.member_since).format('L') }}. Last seen {{ moment(user.last_seen).fromNow() }}.</p>
         <p>
-            {% if user == current_user %}
-            <a class="btn btn-default" href="{{ url_for('.edit_profile') }}">Edit Profile</a>
-            {% endif %}
-            {% if current_user.is_administrator() %}
-            <a class="btn btn-danger" href="{{ url_for('.edit_profile_admin', id=user.id) }}">Edit Profile [Admin]</a>
-            {% endif %}
         </p>
     </div>
 
-    {% if user.invites.count() > 0 %}
+    {% if user == current_user and user.invites.count() > 0 %}
         <h3>Pending Group Invites</h3>
     <p>
     <table class="table table-striped followers">
@@ -60,18 +63,18 @@
 
     {% endif %}
 
-    <!-- TODO: Don't show groups if not user itself-->
-    <h3>Groups of {{ user.username }}</h3>
+    {% if user == current_user %}
+    <h3>Your Groups
+        <small>
+            <a class="btn btn-primary pull-right" href="{{ url_for('groups.create_group') }}">Create New Group</a>
+        </small>
+    </h3>
     <p>
         {% for gm in user.groupmemberships %}
             <a class="btn btn-info" href="{{ url_for('groups.group', id=gm.group_id) }}">{{ gm.group.groupname }} </a>
         {% endfor %}
     </p>
-    <p>
-        {% if user == current_user %}
-            <a class="btn btn-default" href="{{ url_for('groups.create_group') }}">Create New Group</a>
-        {% endif %}
-    </p>
+    {% endif %}
 
 
 </div>

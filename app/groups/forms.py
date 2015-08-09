@@ -26,7 +26,7 @@ class EditMemberShipRoleForm(Form):
 
 class GroupForm(Form):
     groupname = StringField('Group Name', validators=[required(), Length(1, 64)])
-    description = StringField('Description')
+    description = StringField('Description', widget=TextArea())
     submit = SubmitField('Submit')
 
 
