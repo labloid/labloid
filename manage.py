@@ -14,7 +14,7 @@ from app import create_app, db
 from app.models import User, GroupRole, Permission, Post, Comment, PostGroup, GroupMemberShip, Role
 from flask.ext.script import Manager, Shell
 from flask.ext.migrate import Migrate, MigrateCommand
-
+from app import mail
 # -- create app and register with extensions
 app = create_app(os.getenv('FLASK_CONFIG') or 'default')
 manager = Manager(app)
@@ -23,7 +23,8 @@ migrate = Migrate(app, db)
 # --- shell context
 def make_shell_context():
     return dict(app=app, db=db, User=User, Role=Role, GroupRole=GroupRole,
-                Permission=Permission, Post=Post, Comment=Comment, PostGroup=PostGroup, GroupMemberShip=GroupMemberShip)
+                Permission=Permission, Post=Post, Comment=Comment, PostGroup=PostGroup,
+                GroupMemberShip=GroupMemberShip, mail=mail)
 manager.add_command("shell", Shell(make_context=make_shell_context))
 
 

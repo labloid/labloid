@@ -7,18 +7,20 @@ class Config:
     SSL_DISABLE = False
     SQLALCHEMY_COMMIT_ON_TEARDOWN = True
     SQLALCHEMY_RECORD_QUERIES = True
-    MAIL_SERVER = 'smtp.googlemail.com'
-    MAIL_PORT = 587
+    MAIL_SERVER = os.environ.get('MAIL_SERVER')
+    MAIL_PORT =  587
     MAIL_USE_TLS = True
+    MAIL_USE_SSL = False
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
     LABLOID_MAIL_SUBJECT_PREFIX = '[Labloid]'
-    LABLOID_MAIL_SENDER = 'Labloid Admin <labloid@example.com>'
+    LABLOID_MAIL_SENDER = os.environ.get('MAIL_SENDER')
     LABLOID_ADMIN = os.environ.get('LABLOID_ADMIN')
     LABLOID_POSTS_PER_PAGE = 20
     LABLOID_FOLLOWERS_PER_PAGE = 50
     LABLOID_COMMENTS_PER_PAGE = 30
     LABLOID_SLOW_DB_QUERY_TIME=0.5
+
 
     @staticmethod
     def init_app(app):
