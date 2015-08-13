@@ -29,6 +29,9 @@ class GroupForm(Form):
     description = StringField('Description', widget=TextArea())
     submit = SubmitField('Submit')
 
+    def validate_groupname(self, field):
+        if PostGroup.exists(field.data):
+            raise ValidationError("Groupname already exists. Please choose a different one.")
 
 
 

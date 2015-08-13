@@ -52,6 +52,24 @@ def deploy():
 
 # --- run the application
 
+@manager.command
+def init_dev():
+    """Initialize database, migrate, upgrade, and perform initial inserts."""
+    from flask.ext.migrate import upgrade, init, migrate
+    from app.models import GroupRole, Role, User
+
+    init()
+    migrate()
+    upgrade()
+
+    # create user roles
+    GroupRole.insert_roles()
+    Role.insert_roles()
+
+    u = User(username='Tester', email='test@labloid.org', confirmed=True)
+    u.password = 'test123'
+    db.session.add(u)
 
 if __name__ == '__main__':
+
     manager.run()

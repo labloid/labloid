@@ -149,7 +149,7 @@ class GroupInvite(db.Model):
 class PostGroup(db.Model):
     __tablename__ = 'postgroups'
     id = db.Column(db.Integer, primary_key=True)
-    groupname = db.Column(db.String(256), index=True)
+    groupname = db.Column(db.String(256), index=True, unique=True)
     memberships = db.relationship("GroupMemberShip", backref="group", lazy='dynamic')
     invites = db.relationship("GroupInvite", backref="group", lazy='dynamic')
     description = db.Column(db.Text)
@@ -168,6 +168,10 @@ class PostGroup(db.Model):
         for gm in self.memberships:
             ret += self.user_can(gm.user, Permission.ADMINISTER)
         return ret
+
+    @staticmethod
+    def exists(groupname):
+        return PostGroup.query.filter_by(groupname=groupname).count() > 0
 
     @property
     def users(self):
@@ -353,7 +357,6 @@ class Post(db.Model):
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     author_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     comments = db.relationship('Comment', backref='post', lazy='dynamic')
-    # TODO: GROUPS
     @staticmethod
     def on_changed_body(target, value, oldvalue, initiator):
         allowed_tags = ['a', 'abbr', 'acronym', 'b', 'blockquote', 'code',
